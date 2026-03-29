@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Drawing Relay</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  #screen {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #status {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    color: #fff;
+    font: 14px monospace;
+    background: rgba(0,0,0,0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="status">Connecting...</div>
+<img id="screen" src="" alt="">
+<script>
+const host = location.host;
+const statusEl = document.getElementById('status');
+const screenEl = document.getElementById('screen');
+let prevBlob = null;
+
+function connectScreen() {
+  const ws = new WebSocket(`ws://${host}/ws/screen`);
+  ws.binaryType = 'blob';
+  ws.onmessage = (e) => {
+    if (prevBlob) URL.revokeObjectURL(prevBlob);
+    const url = URL.createObjectURL(e.data);
+    screenEl.src = url;
+    prevBlob = url;
+  };
+  ws.onopen = () => { statusEl.textContent = 'Connected'; };
+  ws.onclose = () => {
+    statusEl.textContent = 'Disconnected - reconnecting...';
+    setTimeout(connectScreen, 1000);
+  };
+}
+
+function connectInput() {
+  const ws = new WebSocket(`ws://${host}/ws/input`);
+  let active = false;
+  let lastMoveTime = 0;
+  const MOVE_THROTTLE_MS = 8;
+
+  function send(type, touch) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    if (type === 'move') {
+      const now = performance.now();
+      if (now - lastMoveTime < MOVE_THROTTLE_MS) return;
+      lastMoveTime = now;
+    }
+    const rect = screenEl.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) / rect.width;
+    const y = (touch.clientY - rect.top) / rect.height;
+    ws.send(JSON.stringify({
+      type,
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, y))
+    }));
+  }
+
+  screenEl.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    active = true;
+    send('start', e.touches[0]);
+  }, { passive: false });
+
+  screenEl.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (active) send('move', e.touches[0]);
+  }, { passive: false });
+
+  screenEl.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (active) {
+      send('end', e.changedTouches[0]);
+      active = false;
+    }
+  }, { passive: false });
+
+  screenEl.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    if (active) {
+      send('end', e.changedTouches[0]);
+      active = false;
+    }
+  }, { passive: false });
+
+  ws.onclose = () => { setTimeout(connectInput, 1000); };
+}
+
+connectScreen();
+connectInput();
+</script>
+</body>
+</html>
