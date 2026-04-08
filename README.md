@@ -56,3 +56,7 @@ Example with lower resolution for slower networks:
 ```bash
 python3 -u server.py --width 1920 --quality 60
 ```
+
+I have added an Objective-C++ version in the csir directory.
+If you need some more speed try that one.
+No I did not want to create a separate repository.

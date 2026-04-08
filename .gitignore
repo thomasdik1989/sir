@@ -1,1 +1,3 @@
 .venv
+# Don't add the built version you should compile this on your machine.
+csir/csir
