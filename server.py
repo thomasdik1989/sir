@@ -4,14 +4,13 @@ import io
 import json
 import os
 import socket
-import sys
 import time
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-from aiohttp import web
 import Quartz
+from aiohttp import web
 from PIL import Image
 
 
